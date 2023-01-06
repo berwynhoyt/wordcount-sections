@@ -1,0 +1,3 @@
+Wordcount Sections in a LibreOffice Writer document.
+
+This extension counts words in each section of a file and displays each wordcount in the status bar, e.g. Abstract, Essay, Bibliography, and Footnotes.

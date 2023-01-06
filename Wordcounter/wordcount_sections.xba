@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="wordcount_sections" script:language="StarBasic">REM  *****  BASIC  *****
+
+&apos; Count words between bookmarked sections
+
+&apos; Developed using examples at: https://wiki.documentfoundation.org/Documentation/BASIC_Guide#Searching_for_Text_Portions
+&apos; And BASIC API reference at: https://api.libreoffice.org/docs/idl/ref/index.html
+
+Sub Main
+	bookmark_wordcounter
+End Sub
+
+Sub bookmark_wordcounter
+	doc = ThisComponent
+	bookmarks = doc.Bookmarks
+	n_bookmarks = bookmarks.getCount()
+
+	cursor = doc.Text.createTextCursor
+	cursor.gotoStart(false)
+
+	&apos; Count words at beginning of document up to the first bookmark to include in total
+	results = &quot;WORDCOUNT: &quot;
+	statusbar = doc.CurrentController.StatusIndicator
+	statusbar.start(results, 100)
+	if n_bookmarks &gt; 0 then
+		bookmark = bookmarks.getByIndex(0)
+		cursor.gotoRange(bookmark.Anchor, true) &apos; true = expand selection
+	else
+		cursor.gotoEnd(true)
+	end if
+	count = hotcount(cursor.String)
+	total = count
+	&apos; Uncomment if you want to print # words before the first bookmark
+	&apos; results = results &amp; &quot;Beginning&quot; &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+	&apos; statusbar.text = results
+
+	&apos; Count words after each bookmark
+	for i=1 to n_bookmarks
+		name = bookmark.name
+		cursor.gotoRange(bookmark.Anchor, False) &apos; true = expand selection
+		if i &lt; n_bookmarks then
+			bookmark = bookmarks.getByIndex(i)
+			cursor.gotoRange(bookmark.Anchor, true) &apos; true = expand selection
+		else
+			cursor.gotoEnd(true)
+		end if
+		count = hotcount(cursor.String)
+		total = total + count
+		results = results &amp; name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+		statusbar.text = results
+	next i
+
+	&apos; Count words in footnotes so total matches libreoffice total
+	fnotes=doc.getFootNotes()
+	if fnotes.hasElements() then
+		fnotecount=0
+		for nfnotes=0 to fnotes.getCount()-1
+			thisnote=fnotes.getbyIndex(nfnotes)
+			fnotecount=fnotecount+hotcount(thisnote.getString()) - 1  &apos; subtract footnote number
+		next nfnotes
+		total = total + fnotecount
+		results = results &amp; &quot;Footnotes=&quot; &amp; fnotecount &amp; &quot;, &quot;
+		statusbar.text = results
+	end if
+
+	results = results &amp; &quot;Total&quot; &amp; &quot;=&quot; &amp; total
+	statusbar.text = results
+
+	libreoffice_total = doc.WordCount
+	if libreoffice_total &lt;&gt; total then
+		msgbox(&quot;WARNING: I calculate &quot; &amp; total &amp; &quot; total words, but libreoffice calculates &quot; &amp; libreoffice_total &amp; &quot; total words&quot;)
+	end if
+
+	wait 4000  &apos; ms
+	statusbar.reset
+	statusbar.end
+End Sub
+
+Sub wc_under_each_heading1
+	doc = ThisComponent
+	cursor = doc.Text.createTextCursor
+
+	results = &quot;WORDCOUNT: &quot;
+	statusbar = doc.CurrentController.StatusIndicator
+	statusbar.start(results, 100)
+
+	searcher = doc.createSearchDescriptor
+	searcher.SearchStyles = True &apos; search for the specified paragraph template (plan to use say &apos;Abstract&apos; style)
+	searcher.SearchString = &quot;Heading 1&quot;
+	found = doc.findFirst(searcher)
+	do until IsNull(found)
+		cursor.gotoRange(found, False) &apos; true = expand selection
+		found = doc.findNext(found.end, searcher)
+		if IsNull(found) then
+			cursor.gotoEnd(true)
+		else
+			cursor.gotoRange(found.Start, true) &apos; true = expand selection
+		end if
+		count = hotcount(cursor.String)
+		msgbox(count &amp; &quot;words&quot;)
+	loop
+End Sub
+
+Function hotcount(aString)
+	&apos; Count words using the same breakiterator as the program
+	dim mystartpos as long
+	dim numwords,nw 
+	dim nextwd as new com.sun.star.i18n.Boundary
+	dim aLocale as new com.sun.star.lang.Locale
+
+	aLocale.Language=&quot;en&quot;
+	numwords=1
+	mystartpos=0
+	brk=createUnoService(&quot;com.sun.star.i18n.BreakIterator&quot;)
+	nextwd=brk.nextWord(aString,startpos,aLocale,com.sun.star.i18n.WordType.WORD_COUNT)
+	do while nextwd.startPos&lt;&gt; nextwd.endPos
+		numwords=numwords+1
+		nw=nextwd.startPos
+		nextwd=brk.nextWord(aString,nw,aLocale,com.sun.star.i18n.WordType.WORD_COUNT)
+	loop
+	hotcount=numwords
+End Function
+
+</script:module>
