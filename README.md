@@ -1,6 +1,6 @@
 # Wordcount Bookmarked Sections in Libreoffice Writer
 
-This is a Libreoffice Writer extension that counts words in each section of a file and displays each wordcount in the status bar or document. Its purpose is to show your progress when writing a document or essay that has word limits on each section. For example: Abstract, Essary, Bibliography, and Footnotes.
+This is a Libreoffice Writer extension that counts words in each section of a document and displays each wordcount in the status bar or inserted into the document as a field. Its purpose is to let you know when you're nearly done writing each section. For example: Abstract, Essay, Bibliography, and Footnotes.
 
 ## Usage
 
@@ -15,9 +15,9 @@ This is a Libreoffice Writer extension that counts words in each section of a fi
 
 ### Notes on counting accuracy
 
-Be aware that Libeoffice can produce a slightly different word-count than some versions of MS Word. You can work around these problems as follows:
+The word counter uses the same word separator as Libreoffice, so it's accurate, compared to both Libreoffice and MS Word, with the following exceptions:
 
-- The big one is that Libreoffice and Word wordcount totals both include bullets/numbers counted as one word each. But I can't figure out how to do this since I'm counting data from the string returned by textCursor.getString() which data does not even contain the bullets! (If anyone knows how to solve this, please let me know by posting and issue report.)
+- If your document has bullets/numbering, the extension's wordcount will be low by one count per bullet compared to Libreoffice's total wordcount: see second screenshot. (If you know how I can fix this, let me know by posting an issue. I'm using counting words in textCursor.getString() which does not contain bullets.)
 - Libreoffice completely ignores superscripted footnote references (as it should), whereas Word incorrectly count them as separate words if they are followed by punctuation or surrounded by space. Normally you should not follow footnote references by punctuation, but one valid case is right before the end of a parenthesis.
 - Once I found an obscure character in a document that caused Libreoffice to stop counting words until the end of the line. The character was unicode '\u200b' but I do not know how it got there.
 - This script assumes that the Writer setting at `Tools -> Options -> Writer -> General -> Wordcount -> Additional Separators` contains only n-dash and m-dash (which is the default). If the user has added any more characters, they will not be taken into account because I don't know how to fetch this setting into my script.
