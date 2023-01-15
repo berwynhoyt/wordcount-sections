@@ -36,10 +36,10 @@ Function bookmark_wordcounter()
 	else
 		cursor.gotoEnd(true)
 	end if
-	count = wordcount(cursor.String)
+	count = wordcount_string(cursor.String)
 	total = count
-	&apos; Uncomment if you want to show # words before the first bookmark
-	&apos; results = results &amp; &quot;Beginning&quot; &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+	&apos;Uncomment if you want to show # words before the first bookmark
+	&apos;results = results &amp; &quot;Beginning&quot; &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
 
 	&apos; Count words after each bookmark
 	for i=1 to n_bookmarks
@@ -51,7 +51,7 @@ Function bookmark_wordcounter()
 		else
 			cursor.gotoEnd(true)
 		end if
-		count = wordcount(cursor.String)
+		count = wordcount_string(cursor.String)
 		total = total + count
 		update_field(&quot;Wordcount_&quot; &amp; name, count)
 		results = results &amp; name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
@@ -63,10 +63,10 @@ Function bookmark_wordcounter()
 		fnotecount=0
 		for nfnotes=0 to fnotes.getCount()-1
 			thisnote=fnotes.getbyIndex(nfnotes)
-			fnotecount=fnotecount+wordcount(thisnote.getString()) - 1  &apos; subtract footnote number
+			fnotecount=fnotecount+wordcount_string(thisnote.getString())
 		next nfnotes
 		total = total + fnotecount
-		update_field(&quot;Wordcount_Footnotes&quot;, count)
+		update_field(&quot;Wordcount_Footnotes&quot;, fnotecount)
 		results = results &amp; &quot;Footnotes=&quot; &amp; fnotecount &amp; &quot;, &quot;
 	end if
 
@@ -83,9 +83,15 @@ Function bookmark_wordcounter()
 	bookmark_wordcounter = results
 End Function
 
-Function wordcount(str)
+Function wordcount_string(str)
 	&apos; Count words using Libreoffice&apos;s WORD_COUNT break iterator
 	dim locale as new com.sun.star.lang.Locale
+	
+	&apos; Treat n-dash and m-dash as spaces.
+	&apos; These two characters are the default in Tools -&gt; Options -&gt; Writer -&gt; General -&gt; Wordcount -&gt; Additional Separators
+	&apos; If I knew how to fetch that option data, I&apos;d use it here instead of hard-coding it.
+	str = replace(str, &quot;–&quot;, &quot; &quot;)
+	str = replace(str, &quot;—&quot;, &quot; &quot;)
 
 	brk=createUnoService(&quot;com.sun.star.i18n.BreakIterator&quot;)
 	locale.Language=&quot;en&quot;
@@ -100,7 +106,7 @@ Function wordcount(str)
 		numwords=numwords+1
 		nextwd=brk.nextWord(str, nextwd.startPos, locale, boundary_type)
 	loop
-	wordcount=numwords
+	wordcount_string=numwords
 End Function
 
 Function update_field(varname, value)

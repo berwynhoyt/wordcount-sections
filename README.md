@@ -6,8 +6,24 @@ This is a Libreoffice Writer extension that counts words in each section of a fi
 
 1. Mark sections by simply adding a bookmark at the start of each section using the Libreoffice Writer menu option `Insert -> Bookmark` (These can be viewed later in the navigator sidebar by pressing F5).
 2. Then simply type Ctrl-Alt-W (or Cmd-Alt-W on Mac) and it will display the wordcount for each section in the status bar for 4 seconds.
-3. Ctrl-Alt-W will also create wordcount fields that you can insert into the document with Ctrl-F2 -> Variables -> User Field.
+
+### Advanced Usage
+
+1. Ctrl-Alt-W will also create wordcount fields that you can insert into the document with `Ctrl-F2 -> Variables -> User Field`.
    If there are bookmarks, the wordcount fields will also be updated every time the document is saved.
+2. You can even enter formulas based on the wordcounts. If, for example, you have a bookmark called `Essay`, then to show footnotes as a percentage of Essay length, press `Ctrl-F2 -> Variables -> Insert Formula` and type into the Formula box `Wordcount_Footnotes/Wordcount_Essay` then format it like a percentage in the Format box by clicking `Additional Formats` and finally click `Insert` to insert it into your document.
+
+### Notes on counting accuracy
+
+Be aware that Libeoffice can produce a slightly different word-count than some versions of MS Word. You can work around these problems as follows:
+
+- The big one is that Libreoffice and Word wordcount totals both include bullets/numbers counted as one word each. But I can't figure out how to do this since I'm counting data from the string returned by textCursor.getString() which data does not even contain the bullets! (If anyone knows how to solve this, please let me know by posting and issue report.)
+- Libreoffice completely ignores superscripted footnote references (as it should), whereas Word incorrectly count them as separate words if they are followed by punctuation or surrounded by space. Normally you should not follow footnote references by punctuation, but one valid case is right before the end of a parenthesis.
+- Once I found an obscure character in a document that caused Libreoffice to stop counting words until the end of the line. The character was unicode '\u200b' but I do not know how it got there.
+- This script assumes that the Writer setting at `Tools -> Options -> Writer -> General -> Wordcount -> Additional Separators` contains only n-dash and m-dash (which is the default). If the user has added any more characters, they will not be taken into account because I don't know how to fetch this setting into my script.
+- If you place a bookmark in the middle of the word, that will effectively break that word in two, counting it twice in this extension's total (though not in Libreoffice's total wordcount)
+
+These tests were done on Libreoffice 7.4.4.2 and MS Word versions 2007 and Office 365 online as at Jan 2023.
 
 ## Installation
 
