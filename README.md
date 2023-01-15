@@ -1,11 +1,13 @@
 # Wordcount Bookmarked Sections in Libreoffice Writer
 
-This is a Libreoffice Writer extension that counts words in each section of a file and displays each wordcount in the status bar. Its purpose is to show your progress when writing a document or essay that has word limits on each section. For example: Abstract, Essary, Bibliography, and Footnotes.
+This is a Libreoffice Writer extension that counts words in each section of a file and displays each wordcount in the status bar or document. Its purpose is to show your progress when writing a document or essay that has word limits on each section. For example: Abstract, Essary, Bibliography, and Footnotes.
 
 ## Usage
 
 1. Mark sections by simply adding a bookmark at the start of each section using the Libreoffice Writer menu option `Insert -> Bookmark` (These can be viewed later in the navigator sidebar by pressing F5).
 2. Then simply type Ctrl-Alt-W (or Cmd-Alt-W on Mac) and it will display the wordcount for each section in the status bar for 4 seconds.
+3. Ctrl-Alt-W will also create wordcount fields that you can insert into the document with Ctrl-F2 -> Variables -> User Field.
+   If there are bookmarks, the wordcount fields will also be updated every time the document is saved.
 
 ## Installation
 
@@ -39,6 +41,6 @@ Once you have finished changing the source code, turn the macro back into an ext
    2. Click `Organizer` and `Libraries` tab
    3. Browse to the `Wordcounter` macro and click the `Export` button
    4. Select `Export as BASIC Library`
-   5. In the `Save` dialogue, save the files into the `Wordcounter` directory where you cloned this git repository
+   5. In the `Save` dialogue, save the files into the directory where you cloned this git repository. This will replace the source files in the `Wordcounter` subdirectory.
 2. From the git clone root, type `make` to zip the changed files into an .oxt extension file.
 

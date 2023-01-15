@@ -2,16 +2,25 @@
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="wordcount_sections" script:language="StarBasic">REM  *****  BASIC  *****
 
-&apos; Count words between bookmarked sections
+&apos; Count words between bookmarked sections -- attached to hotkey Ctrl-Alt-W
+&apos; Create insertable wordcount fields for the wordcounts under Insert -&gt; Fields -&gt; More Fields... -&gt; Variables -&gt; User Field
+&apos; If there are bookmarks, update the field counts every time the document is saved
 
 &apos; Developed using examples at: https://wiki.documentfoundation.org/Documentation/BASIC_Guide#Searching_for_Text_Portions
 &apos; And BASIC API reference at: https://api.libreoffice.org/docs/idl/ref/index.html
 
 Sub Main
-	bookmark_wordcounter
+	recount_on_save() &apos;Setup save action to force re-count prior to save
+	result = bookmark_wordcounter()
+
+	statusbar = ThisComponent.CurrentController.StatusIndicator
+	statusbar.start(result, 100)
+	wait 4000  &apos; ms
+	statusbar.reset
+	statusbar.end
 End Sub
 
-Sub bookmark_wordcounter
+Function bookmark_wordcounter()
 	doc = ThisComponent
 	bookmarks = doc.Bookmarks
 	n_bookmarks = bookmarks.getCount()
@@ -21,19 +30,16 @@ Sub bookmark_wordcounter
 
 	&apos; Count words at beginning of document up to the first bookmark to include in total
 	results = &quot;WORDCOUNT: &quot;
-	statusbar = doc.CurrentController.StatusIndicator
-	statusbar.start(results, 100)
 	if n_bookmarks &gt; 0 then
 		bookmark = bookmarks.getByIndex(0)
 		cursor.gotoRange(bookmark.Anchor, true) &apos; true = expand selection
 	else
 		cursor.gotoEnd(true)
 	end if
-	count = hotcount(cursor.String)
+	count = wordcount(cursor.String)
 	total = count
-	&apos; Uncomment if you want to print # words before the first bookmark
+	&apos; Uncomment if you want to show # words before the first bookmark
 	&apos; results = results &amp; &quot;Beginning&quot; &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
-	&apos; statusbar.text = results
 
 	&apos; Count words after each bookmark
 	for i=1 to n_bookmarks
@@ -45,10 +51,10 @@ Sub bookmark_wordcounter
 		else
 			cursor.gotoEnd(true)
 		end if
-		count = hotcount(cursor.String)
+		count = wordcount(cursor.String)
 		total = total + count
+		update_field(&quot;Wordcount_&quot; &amp; name, count)
 		results = results &amp; name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
-		statusbar.text = results
 	next i
 
 	&apos; Count words in footnotes so total matches libreoffice total
@@ -57,69 +63,80 @@ Sub bookmark_wordcounter
 		fnotecount=0
 		for nfnotes=0 to fnotes.getCount()-1
 			thisnote=fnotes.getbyIndex(nfnotes)
-			fnotecount=fnotecount+hotcount(thisnote.getString()) - 1  &apos; subtract footnote number
+			fnotecount=fnotecount+wordcount(thisnote.getString()) - 1  &apos; subtract footnote number
 		next nfnotes
 		total = total + fnotecount
+		update_field(&quot;Wordcount_Footnotes&quot;, count)
 		results = results &amp; &quot;Footnotes=&quot; &amp; fnotecount &amp; &quot;, &quot;
-		statusbar.text = results
 	end if
 
 	results = results &amp; &quot;Total&quot; &amp; &quot;=&quot; &amp; total
-	statusbar.text = results
+	update_field(&quot;Wordcount_Total&quot;, total)
 
+	&apos; Warn if my calculation is different from libreoffice&apos;s
+	&apos; but allow some play in case the user puts a bookmark in the middle of a word which will effectively count it twice (once in each section)
 	libreoffice_total = doc.WordCount
-	if libreoffice_total &lt;&gt; total then
-		msgbox(&quot;WARNING: I calculate &quot; &amp; total &amp; &quot; total words, but libreoffice calculates &quot; &amp; libreoffice_total &amp; &quot; total words&quot;)
+	if libreoffice_total &gt; total or libreoffice_total + n_bookmarks &lt; total then
+		results = results &amp; &quot; (but libreoffice total=&quot; &amp; libreoffice_total &amp; &quot;)&quot;
 	end if
 
-	wait 4000  &apos; ms
-	statusbar.reset
-	statusbar.end
-End Sub
-
-Sub wc_under_each_heading1
-	doc = ThisComponent
-	cursor = doc.Text.createTextCursor
-
-	results = &quot;WORDCOUNT: &quot;
-	statusbar = doc.CurrentController.StatusIndicator
-	statusbar.start(results, 100)
-
-	searcher = doc.createSearchDescriptor
-	searcher.SearchStyles = True &apos; search for the specified paragraph template (plan to use say &apos;Abstract&apos; style)
-	searcher.SearchString = &quot;Heading 1&quot;
-	found = doc.findFirst(searcher)
-	do until IsNull(found)
-		cursor.gotoRange(found, False) &apos; true = expand selection
-		found = doc.findNext(found.end, searcher)
-		if IsNull(found) then
-			cursor.gotoEnd(true)
-		else
-			cursor.gotoRange(found.Start, true) &apos; true = expand selection
-		end if
-		count = hotcount(cursor.String)
-		msgbox(count &amp; &quot;words&quot;)
-	loop
-End Sub
-
-Function hotcount(aString)
-	&apos; Count words using the same breakiterator as the program
-	dim mystartpos as long
-	dim numwords,nw 
-	dim nextwd as new com.sun.star.i18n.Boundary
-	dim aLocale as new com.sun.star.lang.Locale
-
-	aLocale.Language=&quot;en&quot;
-	numwords=1
-	mystartpos=0
-	brk=createUnoService(&quot;com.sun.star.i18n.BreakIterator&quot;)
-	nextwd=brk.nextWord(aString,startpos,aLocale,com.sun.star.i18n.WordType.WORD_COUNT)
-	do while nextwd.startPos&lt;&gt; nextwd.endPos
-		numwords=numwords+1
-		nw=nextwd.startPos
-		nextwd=brk.nextWord(aString,nw,aLocale,com.sun.star.i18n.WordType.WORD_COUNT)
-	loop
-	hotcount=numwords
+	bookmark_wordcounter = results
 End Function
+
+Function wordcount(str)
+	&apos; Count words using Libreoffice&apos;s WORD_COUNT break iterator
+	dim locale as new com.sun.star.lang.Locale
+
+	brk=createUnoService(&quot;com.sun.star.i18n.BreakIterator&quot;)
+	locale.Language=&quot;en&quot;
+	boundary_type = com.sun.star.i18n.WordType.WORD_COUNT
+
+	numwords=0
+	startpos=0
+	nextwd=brk.getWordBoundary(str, startpos, locale, boundary_type, TRUE)
+	do while nextwd.endPos &gt; nextwd.startPos
+		&apos;Include the following line to display each word as it is counted -- for debug purposes
+		&apos;msgbox(nextwd.startPos &amp; &quot; &quot; &amp; nextwd.endPos &amp; &quot;: &quot; &amp; mid(str, nextwd.startPos+1, nextwd.endPos-nextwd.startPos))
+		numwords=numwords+1
+		nextwd=brk.nextWord(str, nextwd.startPos, locale, boundary_type)
+	loop
+	wordcount=numwords
+End Function
+
+Function update_field(varname, value)
+	&apos; Update user field variable `varname`, creating it if necessary
+	doc = ThisComponent
+	user_path = &quot;com.sun.star.text.fieldmaster.User&quot;
+	var_path = user_path &amp; &quot;.&quot; &amp; varname
+	on error goto ErrorHandler
+		var = doc.getTextFieldMasters.getByName(var_path)
+	on error goto 0
+	var.Value = value
+	exit function
+ErrorHandler:
+	var = doc.createInstance(user_path)
+	var.Name = varname
+	resume next
+End Function
+
+Sub on_save( oEvent As Object )
+	&apos; This subroutine gets connected to the &quot;Save Document&quot; event of LibreOffice, OnSaveAs.
+	if ThisComponent.Bookmarks.getCount() &gt; 0 then
+		bookmark_wordcounter()
+	end if
+End Sub
+
+Sub recount_on_save()
+	&apos; Call this macro to connect the LibreOffice &quot;Save Document&quot; event to the Basic macro `on_save()`.
+	Dim aProps(1) As New com.sun.star.beans.PropertyValue
+	aProps(0).Name		= &quot;EventType&quot;
+	aProps(0).Value		= &quot;Script&quot;
+	aProps(1).Name		= &quot;Script&quot;
+	aProps(1).Value		= &quot;vnd.sun.star.script:Wordcounter.wordcount_sections.bookmark_wordcounter?language=Basic&amp;location=application&quot;
+
+	Dim oGlobalEventBroadcaster As Object
+	oGlobalEventBroadcaster = GetDefaultContext().getByName( &quot;/singletons/com.sun.star.frame.theGlobalEventBroadcaster&quot; )
+	oGlobalEventBroadcaster.Events.replaceByName(&quot;OnSave&quot;, aProps())
+End Sub
 
 </script:module>
