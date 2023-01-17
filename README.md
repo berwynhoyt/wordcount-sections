@@ -1,4 +1,4 @@
-# Wordcount Bookmarked Sections in Libreoffice Writer
+# Wordcount Bookmarked Sections in Libreoffice
 
 This is a Libreoffice Writer extension that counts words in each section of a document and displays each wordcount in the status bar or inserted into the document as a field. Its purpose is to let you know when you're nearly done writing each section. For example: Abstract, Essay, Bibliography, and Footnotes.
 
