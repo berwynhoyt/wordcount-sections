@@ -125,13 +125,6 @@ ErrorHandler:
 	resume next
 End Function
 
-Sub on_save( oEvent As Object )
-	&apos; This subroutine gets connected to the &quot;Save Document&quot; event of LibreOffice, OnSaveAs.
-	if ThisComponent.Bookmarks.getCount() &gt; 0 then
-		bookmark_wordcounter()
-	end if
-End Sub
-
 Sub recount_on_save()
 	&apos; Call this macro to connect the LibreOffice &quot;Save Document&quot; event to the Basic macro `on_save()`.
 	Dim aProps(1) As New com.sun.star.beans.PropertyValue
@@ -140,9 +133,7 @@ Sub recount_on_save()
 	aProps(1).Name		= &quot;Script&quot;
 	aProps(1).Value		= &quot;vnd.sun.star.script:Wordcounter.wordcount_sections.bookmark_wordcounter?language=Basic&amp;location=application&quot;
 
-	Dim oGlobalEventBroadcaster As Object
-	oGlobalEventBroadcaster = GetDefaultContext().getByName( &quot;/singletons/com.sun.star.frame.theGlobalEventBroadcaster&quot; )
-	oGlobalEventBroadcaster.Events.replaceByName(&quot;OnSave&quot;, aProps())
+	ThisComponent.Events.replaceByName(&quot;OnSave&quot;, aProps())
 End Sub
 
 </script:module>
