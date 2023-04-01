@@ -10,7 +10,7 @@
          <node oor:name="com.sun.star.text.TextDocument">
             <node oor:name="W_MOD1_MOD2" oor:op="replace">
                <prop oor:name="Command">
-                  <value xml:lang="en-US">vnd.sun.star.script:Wordcounter.wordcount_sections.Main?language=Basic&amp;location=application</value>
+                  <value xml:lang="en-US">vnd.sun.star.script:Wordcounter.wordcount_sections.on_hotkey?language=Basic&amp;location=application</value>
                </prop>
             </node>
          </node>

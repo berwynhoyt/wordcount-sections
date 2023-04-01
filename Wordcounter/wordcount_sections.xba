@@ -9,8 +9,11 @@
 &apos; Developed using examples at: https://wiki.documentfoundation.org/Documentation/BASIC_Guide#Searching_for_Text_Portions
 &apos; And BASIC API reference at: https://api.libreoffice.org/docs/idl/ref/index.html
 
-Sub Main
-	recount_on_save() &apos;Setup save action to force re-count prior to save
+Sub on_hotkey  &apos; Set to run on hotkey specified in Accelerators.xcu file of the extension (initially Ctrl-Alt-W)
+	if not isTextDocument(ThisComponent) then
+		exit sub
+	end if
+	setup_on_save() &apos;Setup save action to force re-count prior to save
 	result = bookmark_wordcounter()
 
 	statusbar = ThisComponent.CurrentController.StatusIndicator
@@ -125,20 +128,32 @@ ErrorHandler:
 	resume next
 End Function
 
+function isTextDocument(doc) as boolean
+	&apos; Taken from https://wiki.openoffice.org/wiki/Currently_active_document
+	isTextDocument = FALSE
+	if HasUnoInterfaces(doc, &quot;com.sun.star.lang.XServiceInfo&quot;) then
+	   if doc.supportsService (&quot;com.sun.star.text.GenericTextDocument&quot;) then
+	      isTextDocument = TRUE
+		end if
+	end if
+End Function
+
 Sub on_save( oEvent As Object )
 	&apos; This subroutine gets connected to the &quot;Save Document&quot; event of LibreOffice, OnSaveAs.
-	if ThisComponent.Bookmarks.getCount() &gt; 0 then
-		bookmark_wordcounter()
+	if isTextDocument(ThisComponent) then
+		if ThisComponent.Bookmarks.getCount() &gt; 0 then
+			bookmark_wordcounter()
+		end if
 	end if
 End Sub
 
-Sub recount_on_save()
+Sub setup_on_save()
 	&apos; Call this macro to connect the LibreOffice &quot;Save Document&quot; event to the Basic macro `on_save()`.
 	Dim aProps(1) As New com.sun.star.beans.PropertyValue
 	aProps(0).Name		= &quot;EventType&quot;
 	aProps(0).Value		= &quot;Script&quot;
 	aProps(1).Name		= &quot;Script&quot;
-	aProps(1).Value		= &quot;vnd.sun.star.script:Wordcounter.wordcount_sections.bookmark_wordcounter?language=Basic&amp;location=application&quot;
+	aProps(1).Value		= &quot;vnd.sun.star.script:Wordcounter.wordcount_sections.on_save?language=Basic&amp;location=application&quot;
 
 	Dim oGlobalEventBroadcaster As Object
 	oGlobalEventBroadcaster = GetDefaultContext().getByName( &quot;/singletons/com.sun.star.frame.theGlobalEventBroadcaster&quot; )
