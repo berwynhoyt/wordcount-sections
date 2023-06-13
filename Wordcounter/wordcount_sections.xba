@@ -13,7 +13,7 @@ Sub on_hotkey  &apos; Set to run on hotkey specified in Accelerators.xcu file of
 	if not isTextDocument(ThisComponent) then
 		exit sub
 	end if
-	setup_on_save() &apos;Setup save action to force re-count prior to save
+	setupOnSave() &apos;Setup save action to force re-count prior to save
 	result = bookmark_wordcounter()
 
 	statusbar = ThisComponent.CurrentController.StatusIndicator
@@ -138,8 +138,7 @@ function isTextDocument(doc) as boolean
 	end if
 End Function
 
-Sub on_save( oEvent As Object )
-	&apos; This subroutine gets connected to the &quot;Save Document&quot; event of LibreOffice, OnSaveAs.
+Sub OnSave(oEvent As Object)
 	if isTextDocument(ThisComponent) then
 		if ThisComponent.Bookmarks.getCount() &gt; 0 then
 			bookmark_wordcounter()
@@ -147,17 +146,65 @@ Sub on_save( oEvent As Object )
 	end if
 End Sub
 
-Sub setup_on_save()
-	&apos; Call this macro to connect the LibreOffice &quot;Save Document&quot; event to the Basic macro `on_save()`.
+Sub setupOnSave()
+	&apos; Connects the LibreOffice &quot;Save Document&quot; event to our Basic subroutine `GlobalOnSave()`.
+	&apos; It adds OnSave to globalEventBroadcaster instead of ThisComponent (current doc) because
+	&apos; otherwise LibreOffice produces a warning that this document has macros.
+	&apos; Copies a stub subroutine GlobalOnSave() into the Standard library
+	&apos; so that OnSave doesn&apos;t produce errors even if the extension is uninstalled.
+	copy_code(&quot;Wordcounter&quot;, &quot;wordcount_sections&quot;, &quot;Standard&quot;, &quot;wordcount_sections&quot;, &quot;copy_marker&quot;)
+
 	Dim aProps(1) As New com.sun.star.beans.PropertyValue
 	aProps(0).Name		= &quot;EventType&quot;
 	aProps(0).Value		= &quot;Script&quot;
 	aProps(1).Name		= &quot;Script&quot;
-	aProps(1).Value		= &quot;vnd.sun.star.script:Wordcounter.wordcount_sections.on_save?language=Basic&amp;location=application&quot;
+	aProps(1).Value		= &quot;vnd.sun.star.script:Standard.wordcount_sections.GlobalOnSave?language=Basic&amp;location=application&quot;
 
 	Dim oGlobalEventBroadcaster As Object
 	oGlobalEventBroadcaster = GetDefaultContext().getByName( &quot;/singletons/com.sun.star.frame.theGlobalEventBroadcaster&quot; )
 	oGlobalEventBroadcaster.Events.replaceByName(&quot;OnSave&quot;, aProps())
+End Sub
+
+Sub copy_code(fromlib, frommod, tolib, tomod, marker)
+	&apos; Copy code after _marker_ from fromlib/frommod into module tolib/tomod
+	libs = globalscope.basiclibraries
+	libs.loadlibrary(fromlib)
+	libr = libs.getbyname(fromlib)
+	module = libr.getbyname(frommod)
+
+	textSearch = CreateUnoService(&quot;com.sun.star.util.TextSearch&quot;)
+	options = CreateUnoStruct(&quot;com.sun.star.util.SearchOptions&quot;)
+	options.algorithmType = com.sun.star.util.SearchAlgorithms.REGEXP
+	options.searchString = &quot;_&quot; &amp; marker &amp; &quot;_&quot;
+	textSearch.setOptions(options)
+	found = textSearch.searchForward(module, 0, Len(module))
+	code = right(module, Len(module) - found.endOffset(0) - 1)
+
+	libr = libs.getbyname(tolib)
+	if not libs.hasbyname(tolib) then
+		libs.insertbyname(tolib)
+	end if
+	if not libr.hasbyname(tomod) then
+		libr.insertbyname(tomod,code)
+	else
+		libs.loadlibrary(tolib)
+		&apos;libr.removebyname(tomod)
+		libr.replacebyname(tomod,code)
+	end if
+	libs.storelibraries()
+End Sub
+
+
+&apos; The rest of this file gets copied to Standard library so OnSave doesn&apos;t create an error if extension is uninstalled
+&apos; _copy_marker_
+Sub GlobalOnSave(oEvent As Object)
+	&apos; This subroutine gets connected to the &quot;Save Document&quot; event of LibreOffice, OnSaveAs.
+	&apos; It provides a stub so that the OnSave event doesn&apos;t create errors even if the Wordcounter extension is removed
+	library = &quot;Wordcounter&quot;
+	if globalscope.basiclibraries.hasbyname(library) then
+		basiclibraries.loadLibrary(library)
+		Wordcounter.wordcount_sections.OnSave(oEvent)
+	end if
 End Sub
 
 </script:module>
