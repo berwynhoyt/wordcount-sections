@@ -10,9 +10,10 @@
 &apos; And BASIC API reference at: https://api.libreoffice.org/docs/idl/ref/index.html
 
 Sub on_hotkey  &apos; Set to run on hotkey specified in Accelerators.xcu file of the extension (initially Ctrl-Alt-W)
+	dim result, statusbar
 	if not isTextDocument(ThisComponent) then
 		exit sub
-	end if
+	endif
 	setupOnSave() &apos;Setup save action to force re-count prior to save
 	result = bookmark_wordcounter()
 
@@ -24,46 +25,32 @@ Sub on_hotkey  &apos; Set to run on hotkey specified in Accelerators.xcu file of
 End Sub
 
 Function bookmark_wordcounter()
+	dim doc, bookmarks, n_bookmarks, cursor, results, total, last_valid_i, i, name, next_name
+	dim fnotes, fnotecount, thisnote, libreoffice_total
 	doc = ThisComponent
 	bookmarks = doc.Bookmarks
 	n_bookmarks = bookmarks.getCount()
-
 	cursor = doc.Text.createTextCursor
-	cursor.gotoStart(false)
 
-	&apos; Count words at beginning of document up to the first bookmark to include in total
+	&apos; Count words in various sections
 	results = &quot;WORDCOUNT: &quot;
-	count = 0
-	&apos; on Error goto Continuer1
-	if n_bookmarks &gt; 0 then
-		bookmark = bookmarks.getByIndex(0)
-		cursor.gotoRange(bookmark.Anchor, true) &apos; true = expand selection
-	else
-		cursor.gotoEnd(true)
-	end if
-	count = wordcount_string(cursor.String)
-Continuer1:
-	total = count
-	&apos;Uncomment if you want to show # words before the first bookmark
-	&apos;results = results &amp; &quot;Beginning&quot; &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
-
-	&apos; Count words after each bookmark
-	&apos; on Error goto Continuer2
-	for i=1 to n_bookmarks
-		name = bookmark.name
-		cursor.gotoRange(bookmark.Anchor, False) &apos; true = expand selection
-		count = 0
-		if i &lt; n_bookmarks then
-			bookmark = bookmarks.getByIndex(i)
-			cursor.gotoRange(bookmark.Anchor, true) &apos; true = expand selection
-		else
-			cursor.gotoEnd(true)
-		end if
+	total = 0
+	last_valid_i = -1
+	for i=0 to n_bookmarks
+		name = gotoBookmark(cursor, last_valid_i, FALSE)
+		do
+			next_name = gotoBookmark(cursor, i, TRUE)
+			if next_name = FALSE then
+				i = i+1
+			endif
+		loop while next_name = FALSE  &apos; Last bookmark always returns non-FALSE value
+		last_valid_i = i
 		count = wordcount_string(cursor.String)
-Continuer2:
 		total = total + count
-		update_field(&quot;Wordcount_&quot; &amp; name, count)
-		results = results &amp; name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+		if i&gt;0 then  &apos; Count words at beginning of document up to the first bookmark but only to include in total
+			update_field(&quot;Wordcount_&quot; &amp; name, count)
+			results = results &amp; name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+		endif
 	next i
 
 	&apos; Count words in footnotes so total matches libreoffice total
@@ -77,7 +64,7 @@ Continuer2:
 		total = total + fnotecount
 		update_field(&quot;Wordcount_Footnotes&quot;, fnotecount)
 		results = results &amp; &quot;Footnotes=&quot; &amp; fnotecount &amp; &quot;, &quot;
-	end if
+	endif
 
 	results = results &amp; &quot;Total&quot; &amp; &quot;=&quot; &amp; total
 	update_field(&quot;Wordcount_Total&quot;, total)
@@ -87,15 +74,41 @@ Continuer2:
 	libreoffice_total = doc.WordCount
 	if libreoffice_total &gt; total or libreoffice_total + n_bookmarks &lt; total then
 		results = results &amp; &quot; (but libreoffice total=&quot; &amp; libreoffice_total &amp; &quot;)&quot;
-	end if
+	endif
 
 	bookmark_wordcounter = results
+End Function
+
+Function gotoBookmark(cursor, i, expand)
+	&apos; Goto bookmark i, expanding selection if expand is true
+	&apos; Return bookmark name on success; otherwise FALSE
+	dim doc, bookmarks, n_bookmarks, name
+	doc = ThisComponent
+	bookmarks = doc.Bookmarks
+	n_bookmarks = bookmarks.getCount()
+	on Local Error goto BadBookmark
+	if i&lt;0 then
+		cursor.gotoStart(expand)
+		name = &quot;Start&quot;
+	elseif i=n_bookmarks then
+		cursor.gotoEnd(expand)
+		name = &quot;End&quot;
+	else
+		bookmark = bookmarks.getByIndex(i)
+		cursor.gotoRange(bookmark.Anchor, expand)
+		name = bookmark.name
+	endif
+	gotoBookmark = name
+	exit function
+  BadBookmark:
+	gotoBookmark = FALSE
 End Function
 
 Function wordcount_string(str)
 	&apos; Count words using Libreoffice&apos;s WORD_COUNT break iterator
 	dim locale as new com.sun.star.lang.Locale
-	
+	dim brk, boundary_type, numwords, startpos, nextwd
+
 	&apos; Treat n-dash and m-dash as spaces.
 	&apos; These two characters are the default in Tools -&gt; Options -&gt; Writer -&gt; General -&gt; Wordcount -&gt; Additional Separators
 	&apos; If I knew how to fetch that option data, I&apos;d use it here instead of hard-coding it.
@@ -120,18 +133,17 @@ End Function
 
 Function update_field(varname, value)
 	&apos; Update user field variable `varname`, creating it if necessary
+	dim doc, user_path, var_path, var
 	doc = ThisComponent
 	user_path = &quot;com.sun.star.text.fieldmaster.User&quot;
 	var_path = user_path &amp; &quot;.&quot; &amp; varname
-	on error goto ErrorHandler
+	on Local error goto ErrorHandler
 		var = doc.getTextFieldMasters.getByName(var_path)
-	on error goto 0
 	var.Value = value
 	exit function
 ErrorHandler:
 	var = doc.createInstance(user_path)
 	var.Name = varname
-	resume next
 End Function
 
 function isTextDocument(doc) as boolean
@@ -140,16 +152,16 @@ function isTextDocument(doc) as boolean
 	if HasUnoInterfaces(doc, &quot;com.sun.star.lang.XServiceInfo&quot;) then
 	   if doc.supportsService (&quot;com.sun.star.text.GenericTextDocument&quot;) then
 	      isTextDocument = TRUE
-		end if
-	end if
+		endif
+	endif
 End Function
 
 Sub OnSave(oEvent As Object)
 	if isTextDocument(ThisComponent) then
 		if ThisComponent.Bookmarks.getCount() &gt; 0 then
 			bookmark_wordcounter()
-		end if
-	end if
+		endif
+	endif
 End Sub
 
 Sub setupOnSave()
@@ -173,6 +185,7 @@ End Sub
 
 Sub copy_code(fromlib, frommod, tolib, tomod, marker)
 	&apos; Copy code after _marker_ from fromlib/frommod into module tolib/tomod
+	dim libs, libr, module, textSearch, options, found, code
 	libs = globalscope.basiclibraries
 	libs.loadlibrary(fromlib)
 	libr = libs.getbyname(fromlib)
@@ -189,14 +202,14 @@ Sub copy_code(fromlib, frommod, tolib, tomod, marker)
 	libr = libs.getbyname(tolib)
 	if not libs.hasbyname(tolib) then
 		libs.insertbyname(tolib)
-	end if
+	endif
 	if not libr.hasbyname(tomod) then
 		libr.insertbyname(tomod,code)
 	else
 		libs.loadlibrary(tolib)
 		&apos;libr.removebyname(tomod)
 		libr.replacebyname(tomod,code)
-	end if
+	endif
 	libs.storelibraries()
 End Sub
 
@@ -206,13 +219,14 @@ End Sub
 Sub GlobalOnSave(oEvent As Object)
 	&apos; This subroutine gets connected to the &quot;Save Document&quot; event of LibreOffice, OnSaveAs.
 	&apos; It provides a stub so that the OnSave event doesn&apos;t create errors even if the Wordcounter extension is removed
+	dim library
 	library = &quot;Wordcounter&quot;
 	if globalscope.basiclibraries.hasbyname(library) then
 		basiclibraries.loadLibrary(library)
-		on Error goto Continuer
+		on Local Error goto Continuer
 		Wordcounter.wordcount_sections.OnSave(oEvent)
 Continuer:
-	end if
+	endif
 End Sub
 
 </script:module>
