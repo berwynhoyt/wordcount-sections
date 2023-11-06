@@ -33,6 +33,8 @@ Function bookmark_wordcounter()
 
 	&apos; Count words at beginning of document up to the first bookmark to include in total
 	results = &quot;WORDCOUNT: &quot;
+	count = 0
+	&apos; on Error goto Continuer1
 	if n_bookmarks &gt; 0 then
 		bookmark = bookmarks.getByIndex(0)
 		cursor.gotoRange(bookmark.Anchor, true) &apos; true = expand selection
@@ -40,14 +42,17 @@ Function bookmark_wordcounter()
 		cursor.gotoEnd(true)
 	end if
 	count = wordcount_string(cursor.String)
+Continuer1:
 	total = count
 	&apos;Uncomment if you want to show # words before the first bookmark
 	&apos;results = results &amp; &quot;Beginning&quot; &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
 
 	&apos; Count words after each bookmark
+	&apos; on Error goto Continuer2
 	for i=1 to n_bookmarks
 		name = bookmark.name
 		cursor.gotoRange(bookmark.Anchor, False) &apos; true = expand selection
+		count = 0
 		if i &lt; n_bookmarks then
 			bookmark = bookmarks.getByIndex(i)
 			cursor.gotoRange(bookmark.Anchor, true) &apos; true = expand selection
@@ -55,6 +60,7 @@ Function bookmark_wordcounter()
 			cursor.gotoEnd(true)
 		end if
 		count = wordcount_string(cursor.String)
+Continuer2:
 		total = total + count
 		update_field(&quot;Wordcount_&quot; &amp; name, count)
 		results = results &amp; name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
@@ -203,7 +209,9 @@ Sub GlobalOnSave(oEvent As Object)
 	library = &quot;Wordcounter&quot;
 	if globalscope.basiclibraries.hasbyname(library) then
 		basiclibraries.loadLibrary(library)
+		on Error goto Continuer
 		Wordcounter.wordcount_sections.OnSave(oEvent)
+Continuer:
 	end if
 End Sub
 
