@@ -12,6 +12,7 @@ This is a Libreoffice Writer extension that counts words in each section of a do
 1. Ctrl-Alt-W will also create wordcount fields that you can insert into the document with `Ctrl-F2 -> Variables -> User Field`.
    If there are bookmarks, the wordcount fields will also be updated every time the document is saved.
 2. You can even enter formulas based on the wordcounts. If, for example, you have a bookmark called `Essay`, then to show footnotes as a percentage of Essay length, press `Ctrl-F2 -> Variables -> Insert Formula` and type into the Formula box `Wordcount_Footnotes/Wordcount_Essay` then format it like a percentage in the Format box by clicking `Additional Formats` and finally click `Insert` to insert it into your document.
+3. If you have so many sections that the word counts disappear off the end of the status bar, here is a way to [display them in a cover page or footer instead](https://github.com/berwynhoyt/wordcount-sections/issues/3).
 
 ### Notes on counting accuracy
 
