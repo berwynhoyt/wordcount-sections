@@ -25,47 +25,42 @@ Sub on_hotkey  &apos; Set to run on hotkey specified in Accelerators.xcu file of
 End Sub
 
 Function bookmark_wordcounter()
-	dim doc, bookmarks, n_bookmarks, cursor, results, total, last_valid_i, i, name, next_name
-	dim fnotes, fnotecount, thisnote, libreoffice_total
+	dim doc, cursor, results, total, last_valid_i, i, next_name
+	dim fnote_i, fnotecount, thisnote, libreoffice_total
+	dim bookmarks, bookmark, nextmark
 	doc = ThisComponent
 	bookmarks = doc.Bookmarks
-	n_bookmarks = bookmarks.getCount()
 	cursor = doc.Text.createTextCursor
 
 	&apos; Count words in various sections
 	results = &quot;WORDCOUNT: &quot;
 	total = 0
 	last_valid_i = -1
-	for i=0 to n_bookmarks
-		name = gotoBookmark(cursor, last_valid_i, FALSE)
-		do
-			next_name = gotoBookmark(cursor, i, TRUE)
-			if next_name = FALSE then
-				i = i+1
-			endif
-		loop while next_name = FALSE  &apos; Last bookmark always returns non-FALSE value
+	&apos; Also count words in the footnotes of each section	
+	fnotetotal = 0
+	fnote_i = 0
+	&apos; Loop through bookmarks in order
+	for i=0 to bookmarks.getCount()
+		bookmark = gotoBookmark(cursor, last_valid_i, FALSE)
+		nextmark = gotoBookmark(cursor, i, TRUE)  &apos; select up to next bookmark
 		last_valid_i = i
 		count = wordcount_string(cursor.String)
 		total = total + count
-		if i&gt;0 then  &apos; Count words at beginning of document up to the first bookmark but only to include in total
-			update_field(&quot;Wordcount_&quot; &amp; name, count)
-			results = results &amp; name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+		&apos; Also wordcount bookmarks from bookmark index fnote_i through bookmarkName
+		fnotecount = wordcountFootnotes(fnote_i, nextmark)
+		fnotetotal = fnotetotal + fnotecount
+		&apos; Count words at beginning of document up to the first bookmark but only to include in total
+		if i&gt;0 then
+			update_field(&quot;Wordcount_&quot; &amp; bookmark.name, count)
+			update_field(&quot;Wordcount_&quot; &amp; bookmark.name &amp; &quot;_Footnotes&quot;, fnotecount)
+			results = results &amp; bookmark.name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
 		endif
 	next i
+	update_field(&quot;Wordcount_Footnotes&quot;, fnotetotal)
+	results = results &amp; &quot;Footnotes=&quot; &amp; fnotetotal &amp; &quot;, &quot;
 
-	&apos; Count words in footnotes so total matches libreoffice total
-	fnotes=doc.getFootNotes()
-	if fnotes.hasElements() then
-		fnotecount=0
-		for nfnotes=0 to fnotes.getCount()-1
-			thisnote=fnotes.getbyIndex(nfnotes)
-			fnotecount=fnotecount+wordcount_string(thisnote.getString())
-		next nfnotes
-		total = total + fnotecount
-		update_field(&quot;Wordcount_Footnotes&quot;, fnotecount)
-		results = results &amp; &quot;Footnotes=&quot; &amp; fnotecount &amp; &quot;, &quot;
-	endif
-
+	&apos; Include footnotes wordcounts in document wordcount total to match what libreoffice total includes
+	total = total + fnotetotal
 	results = results &amp; &quot;Total&quot; &amp; &quot;=&quot; &amp; total
 	update_field(&quot;Wordcount_Total&quot;, total)
 
@@ -79,29 +74,54 @@ Function bookmark_wordcounter()
 	bookmark_wordcounter = results
 End Function
 
+Function wordcountFootnotes(ByRef i, bookmark)
+	&apos; Loop through and wordcount footnotes from footnote i up to the bookmark
+	&apos; Return wordcount and update i to match the next uncounted bookmark
+	dim doc, wordcount, footnotes, footnote, footnote_pos, bookmark_pos
+	doc = ThisComponent
+
+	footnotes = doc.getFootNotes()
+	wordcount = 0
+	do While i &lt; footnotes.getCount()
+		footnote = footnotes.getbyIndex(i)
+		if bookmark.name &lt;&gt; &quot;End&quot; then
+			if doc.Text.compareRegionStarts(footnote.Anchor, bookmark.Anchor) &lt;= 0 then
+				Exit do
+			endif
+		endif
+		wordcount = wordcount + wordcount_string(footnote.getString())
+		i = i+1
+	loop
+	wordcountFootnotes = wordcount
+End Function
+
 Function gotoBookmark(cursor, i, expand)
 	&apos; Goto bookmark i, expanding selection if expand is true
-	&apos; Return bookmark name on success; otherwise FALSE
-	dim doc, bookmarks, n_bookmarks, name
+	&apos; Return bookmark object on success; otherwise string &quot;Start&quot; or &quot;End&quot;
+	dim doc, bookmarks, n_bookmarks, bookmark
 	doc = ThisComponent
 	bookmarks = doc.Bookmarks
 	n_bookmarks = bookmarks.getCount()
-	on Local Error goto BadBookmark
+	on Local Error goto badBookmark
+  nextBookmark:
 	if i&lt;0 then
 		cursor.gotoStart(expand)
-		name = &quot;Start&quot;
-	elseif i=n_bookmarks then
+		bookmark = CreateUnoStruct(&quot;com.sun.star.beans.PropertyValue&quot;)
+		bookmark.name = &quot;Start&quot;
+	elseif i &gt;= n_bookmarks then
 		cursor.gotoEnd(expand)
-		name = &quot;End&quot;
+		&apos; Create dummy bookmark
+		bookmark = CreateUnoStruct(&quot;com.sun.star.beans.PropertyValue&quot;)
+		bookmark.name = &quot;End&quot;
 	else
 		bookmark = bookmarks.getByIndex(i)
 		cursor.gotoRange(bookmark.Anchor, expand)
-		name = bookmark.name
 	endif
-	gotoBookmark = name
+	gotoBookmark = bookmark
 	exit function
-  BadBookmark:
-	gotoBookmark = FALSE
+  badBookmark:
+	i = i + 1
+	goto nextBookmark
 End Function
 
 Function wordcount_string(str)
@@ -138,12 +158,25 @@ Function update_field(varname, value)
 	user_path = &quot;com.sun.star.text.fieldmaster.User&quot;
 	var_path = user_path &amp; &quot;.&quot; &amp; varname
 	on Local error goto ErrorHandler
-		var = doc.getTextFieldMasters.getByName(var_path)
+	var = doc.getTextFieldMasters.getByName(var_path)
 	var.Value = value
 	exit function
 ErrorHandler:
 	var = doc.createInstance(user_path)
 	var.Name = varname
+End Function
+
+Function get_field(varname)
+	&apos; Fetch the value of user field variable `varname`
+	dim doc, user_path, var_path, var
+	doc = ThisComponent
+	user_path = &quot;com.sun.star.text.fieldmaster.User&quot;
+	var_path = user_path &amp; &quot;.&quot; &amp; varname
+	on Local error goto ErrorHandler
+	var = doc.getTextFieldMasters.getByName(var_path)
+	get_field = var.Value
+	exit function
+ErrorHandler:
 End Function
 
 function isTextDocument(doc) as boolean

@@ -53,11 +53,13 @@ If you wish to alter the macro:
 
 Once you have finished changing the source code, turn the macro back into an extension:
 
-1. First export the macro as a library:
-   1. Go to `Tools -> Macros -> Organize Macros -> BASIC`
-   2. Click `Organizer` and `Libraries` tab
-   3. Browse to the `Wordcounter` macro and click the `Export` button
-   4. Select `Export as BASIC Library`
-   5. In the `Save` dialogue, save the files into the directory where you cloned this git repository. This will replace the source files in the `Wordcounter` subdirectory.
-2. From the git clone root, type `make` to zip the changed files into an .oxt extension file.
+1. Update the library version in `description.xml`: line `<version value="X.Y"/>`
+2. First export the macro as a library:
+   * Go to `Tools -> Macros -> Organize Macros -> BASIC`
+   * Click `Organizer` and `Libraries` tab
+   * Browse to the `Wordcounter` macro and click the `Export` button
+   * Select `Export as BASIC Library`
+   * In the `Save` dialogue, save the files into the directory where you cloned this git repository. This will replace the source files in the `Wordcounter` subdirectory.
+3. From the git clone root, type `make` to zip the changed files into an .oxt extension file.
+4. To tag a new version, commit, then `git tag -n`, `git tag vX.Y -am "Name of tag"`, `git push origin vX.Y`
 
