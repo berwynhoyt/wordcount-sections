@@ -33,11 +33,13 @@ Function bookmark_wordcounter()
 	cursor = doc.Text.createTextCursor
 
 	&apos; Count words in various sections
-	results = &quot;WORDCOUNT: &quot;
+	results = &quot;&quot;
 	total = 0
 	last_valid_i = -1
 	&apos; Also count words in the footnotes of each section	
 	fnotetotal = 0
+	body_total = 0
+	body_fnote_total = 0
 	fnote_i = 0
 	&apos; Loop through bookmarks in order
 	for i=0 to bookmarks.getCount()
@@ -53,7 +55,15 @@ Function bookmark_wordcounter()
 		if i&gt;0 then
 			update_field(&quot;Wordcount_&quot; &amp; bookmark.name, count)
 			update_field(&quot;Wordcount_&quot; &amp; bookmark.name &amp; &quot;_Footnotes&quot;, fnotecount)
-			results = results &amp; bookmark.name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+			&apos; Add bookmark status bar unless bookmark start with &apos;__&apos;
+			if mid(bookmark.name, 1, 2) &lt;&gt; &quot;__&quot; then
+				results = results &amp; bookmark.name &amp; &quot;=&quot; &amp; count &amp; &quot;, &quot;
+			endif
+			&apos; Add bookmark wordcounts to &apos;body&apos; text unless bookmark start with &apos;_&apos;
+			if mid(bookmark.name, 1, 1) &lt;&gt; &quot;_&quot; then
+				body_total = body_total + count
+				body_fnote_total = body_fnote_total + fnotecount
+			endif
 		endif
 	next i
 	update_field(&quot;Wordcount_Footnotes&quot;, fnotetotal)
@@ -61,8 +71,12 @@ Function bookmark_wordcounter()
 
 	&apos; Include footnotes wordcounts in document wordcount total to match what libreoffice total includes
 	total = total + fnotetotal
-	results = results &amp; &quot;Total&quot; &amp; &quot;=&quot; &amp; total
+	results = results &amp; &quot;Total=&quot; &amp; total
 	update_field(&quot;Wordcount_Total&quot;, total)
+
+	update_field(&quot;Wordcount_Body&quot;, body_total)
+	update_field(&quot;Wordcount_Bodynotes&quot;, body_fnote_total)
+	results = &quot;WORDCOUNT: Body=&quot; &amp; body_total &amp; &quot;, &quot; &amp; body_fnote_total &amp; &quot; notes (&quot; &amp; int(100*body_fnote_total/body_total+0.5) &amp; &quot;%): &quot; &amp; results
 
 	&apos; Warn if my calculation is different from libreoffice&apos;s
 	&apos; but allow some play in case the user puts a bookmark in the middle of a word which will effectively count it twice (once in each section)
