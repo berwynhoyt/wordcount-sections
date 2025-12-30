@@ -85,6 +85,9 @@ Function bookmark_wordcounter()
 		results = results &amp; &quot; (but libreoffice total=&quot; &amp; libreoffice_total &amp; &quot;)&quot;
 	endif
 
+	&apos; Update all fields (equivalent to pressing F9) as it doesn&apos;t always to so automatically.
+	ThisComponent.getTextFields().refresh()
+
 	bookmark_wordcounter = results
 End Function
 
