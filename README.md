@@ -1,6 +1,6 @@
 # Wordcount Bookmarked Sections in Libreoffice
 
-This is a Libreoffice Writer extension that counts words in each section of a document and displays each wordcount in the status bar or inserted into the document as a field. Its purpose is to let you know when you're nearly done writing each section. For example: Abstract, Essay, Bibliography, and Footnotes.
+This is a Libreoffice Writer extension that counts words in each section of a document and displays each wordcount in the status bar or inserted into the document as a field. Its purpose is to let you know when you're nearly done writing each section. For example: Abstract, Essay, Bibliography, and Footnotes. It is released under the [MIT license](https://opensource.org/license/mit).
 
 ## Usage
 
@@ -62,4 +62,5 @@ Once you have finished changing the source code, turn the macro back into an ext
    * In the `Save` dialogue, save the files into the directory where you cloned this git repository. This will replace the source files in the `Wordcounter` subdirectory.
 3. From the git clone root, type `make` to zip the changed files into an .oxt extension file.
 4. To tag a new version, commit, then `git tag -n`, `git tag vX.Y -am "Name of tag"`, `git push origin vX.Y`
+5. Now submit the extension on the LibreOffice Extensions website. Select the MIT license.
 
