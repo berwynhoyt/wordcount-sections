@@ -46,21 +46,36 @@ The core of the extension is a Libreoffice BASIC macro.
 
 If you wish to alter the macro:
 
-1. Clone this git repository
-2. Install the .oxt extension (as above)
-3. Open Writer and go to `Tools -> Macros -> Organize Macros -> BASIC`
-4. Find the macro text file under `My Macros / Wordcounter / wordcount_sections` then click `Edit`
+1. Clone this git repository.
+2. Install the .oxt extension (as above).
+3. Take option A or  B below.
 
-Once you have finished changing the source code, turn the macro back into an extension:
+#### Option A: Edit the xba source directly
 
-1. Update the library version in `description.xml`: line `<version value="X.Y"/>`
-2. First export the macro as a library:
+Edit the `Wordcounter/wordcount_sections.xba` source file directly, then rebuild and reinstall the extension with `make install`.
+
+#### Option B: Edit using the Libreoffice macro editor
+
+1. Open Writer and go to `Tools -> Macros -> Organize Macros -> BASIC`
+2. Find the macro text file under `My Macros / Wordcounter / wordcount_sections` then click `Edit`
+3. Edit and test.
+5. When done editing, export the macro as a library:
+
    * Go to `Tools -> Macros -> Organize Macros -> BASIC`
+
    * Click `Organizer` and `Libraries` tab
+
    * Browse to the `Wordcounter` macro and click the `Export` button
+
    * Select `Export as BASIC Library`
+
    * In the `Save` dialogue, save the files into the directory where you cloned this git repository. This will replace the source files in the `Wordcounter` subdirectory.
-3. From the git clone root, type `make` to zip the changed files into an .oxt extension file.
-4. To tag a new version, commit, then `git tag -n`, `git tag vX.Y -am "Name of tag"`, `git push origin vX.Y`
-5. Now submit the extension on the LibreOffice Extensions website. Select the MIT license.
+6. From the git clone root, type `make install` to zip the changed files into an .oxt extension file and ensure it installs.
+
+### Releasing a new version
+
+1. Update the library version in `description.xml`: line `<version value="X.Y"/>`.
+2. Update CHANGES.md.
+3. To tag a new version, commit, then `git tag -n`, `git tag vX.Y -am "Name of tag"`, `git push origin vX.Y`.
+4. Now submit the extension on the LibreOffice Extensions website. Select the MIT license.
 

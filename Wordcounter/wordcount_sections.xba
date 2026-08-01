@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="wordcount_sections" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit  &apos; Require all variables to be dim'd: catches reads of non-existent variables / spelling mistakes
 
 &apos; Count words between bookmarked sections -- attached to hotkey Ctrl-Alt-W
 &apos; Create insertable wordcount fields for the wordcounts under Insert -&gt; Fields -&gt; More Fields... -&gt; Variables -&gt; User Field
@@ -28,6 +29,7 @@ Function bookmark_wordcounter()
 	dim doc, cursor, results, total, last_valid_i, i, next_name
 	dim fnote_i, fnotecount, thisnote, libreoffice_total
 	dim bookmarks, bookmark, nextmark
+	dim fnotetotal, body_total, body_fnote_total, count, body_fnote_percent
 	doc = ThisComponent
 	bookmarks = doc.Bookmarks
 	cursor = doc.Text.createTextCursor
@@ -46,7 +48,7 @@ Function bookmark_wordcounter()
 		bookmark = gotoBookmark(cursor, last_valid_i, FALSE)
 		nextmark = gotoBookmark(cursor, i, TRUE)  &apos; select up to next bookmark
 		last_valid_i = i
-		count = wordcount_string(cursor.String)
+		count = wordcount_string(cursor.String) - deletedWordcount(cursor)
 		total = total + count
 		&apos; Also wordcount bookmarks from bookmark index fnote_i through bookmarkName
 		fnotecount = wordcountFootnotes(fnote_i, nextmark)
@@ -76,12 +78,17 @@ Function bookmark_wordcounter()
 
 	update_field(&quot;Wordcount_Body&quot;, body_total)
 	update_field(&quot;Wordcount_Bodynotes&quot;, body_fnote_total)
-	results = &quot;WORDCOUNT: Body=&quot; &amp; body_total &amp; &quot;, &quot; &amp; body_fnote_total &amp; &quot; notes (&quot; &amp; int(100*body_fnote_total/body_total+0.5) &amp; &quot;%): &quot; &amp; results
+	if body_total &gt; 0 then
+		body_fnote_percent = int(100*body_fnote_total/body_total+0.5)
+	else
+		body_fnote_percent = 0
+	endif
+	results = &quot;WORDCOUNT: Body=&quot; &amp; body_total &amp; &quot;, &quot; &amp; body_fnote_total &amp; &quot; notes (&quot; &amp; body_fnote_percent &amp; &quot;%): &quot; &amp; results
 
 	&apos; Warn if my calculation is different from libreoffice&apos;s
 	&apos; but allow some play in case the user puts a bookmark in the middle of a word which will effectively count it twice (once in each section)
 	libreoffice_total = doc.WordCount
-	if libreoffice_total &gt; total or libreoffice_total + n_bookmarks &lt; total then
+	if libreoffice_total &gt; total or libreoffice_total + bookmarks.getCount() &lt; total then
 		results = results &amp; &quot; (but libreoffice total=&quot; &amp; libreoffice_total &amp; &quot;)&quot;
 	endif
 
@@ -115,17 +122,16 @@ End Function
 Function gotoBookmark(cursor, i, expand)
 	&apos; Goto bookmark i, expanding selection if expand is true
 	&apos; Return bookmark object on success; otherwise string &quot;Start&quot; or &quot;End&quot;
-	dim doc, bookmarks, n_bookmarks, bookmark
+	dim doc, bookmarks, bookmark
 	doc = ThisComponent
 	bookmarks = doc.Bookmarks
-	n_bookmarks = bookmarks.getCount()
 	on Local Error goto badBookmark
   nextBookmark:
 	if i&lt;0 then
 		cursor.gotoStart(expand)
 		bookmark = CreateUnoStruct(&quot;com.sun.star.beans.PropertyValue&quot;)
 		bookmark.name = &quot;Start&quot;
-	elseif i &gt;= n_bookmarks then
+	elseif i &gt;= bookmarks.getCount() then
 		cursor.gotoEnd(expand)
 		&apos; Create dummy bookmark
 		bookmark = CreateUnoStruct(&quot;com.sun.star.beans.PropertyValue&quot;)
@@ -168,6 +174,27 @@ Function wordcount_string(str)
 	wordcount_string=numwords
 End Function
 
+Function deletedWordcount(sectionCursor)
+	&apos; Sum wordcount of tracked-change deletions fully inside sectionCursor&apos;s range
+	dim doc, redlines, redline, i, wc, delcursor
+	doc = ThisComponent
+	redlines = doc.Redlines
+	wc = 0
+	for i = 0 to redlines.getCount() - 1
+		redline = redlines.getByIndex(i)
+		if redline.RedlineType = &quot;Delete&quot; then
+			&apos; compareRegionStarts returns &gt;0 if the first range is earlier, &lt;0 if later, 0 if equal
+			if doc.Text.compareRegionStarts(redline.RedlineStart, sectionCursor.Start) &lt;= 0 and _
+			   doc.Text.compareRegionStarts(redline.RedlineEnd, sectionCursor.End) &gt;= 0 then
+				delcursor = doc.Text.createTextCursorByRange(redline.RedlineStart)
+				delcursor.gotoRange(redline.RedlineEnd, TRUE)
+				wc = wc + wordcount_string(delcursor.getString())
+			endif
+		endif
+	next i
+	deletedWordcount = wc
+End Function
+
 Function update_field(varname, value)
 	&apos; Update user field variable `varname`, creating it if necessary
 	dim doc, user_path, var_path, var
@@ -181,6 +208,7 @@ Function update_field(varname, value)
 ErrorHandler:
 	var = doc.createInstance(user_path)
 	var.Name = varname
+	var.Value = value
 End Function
 
 Function get_field(varname)

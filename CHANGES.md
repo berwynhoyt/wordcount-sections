@@ -1,5 +1,13 @@
 # Wordcount Changelog
 
+### v1.7 Don't count words that have been deleted with change tracking
+
+* Also fixes some bugs that appeared in edges cases:
+  * prevent error when there were no bookmarks
+  * prevent newly created fields getting filled with 0 instead of the right value
+
+### v1.6 Force field update on hotkey or save since automatic field update sometimes stopped working
+
 ### v1.5 Wordcount main body text (totals all unmarked sections)
 
 * Status bar report now provides total wordcount for 'body' and body's footnotes. This total includes all bookmarked sections whose names do not begin with underscore (`_`).
