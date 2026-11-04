@@ -1,5 +1,11 @@
 # Wordcount Changelog
 
+### v1.8 Bugfix: count tracked-change deletions correctly
+
+* Fix low wordcount when a tracked deletion was part of a word that was kept, e.g. deleting "s" from "sees", or a digit from "65".
+  Previously each such deletion subtracted a whole word.
+* Fix high footnote wordcount: tracked deletions inside footnotes are now excluded too.
+
 ### v1.7 Don't count words that have been deleted with change tracking
 
 * Also fixes some bugs that appeared in edges cases:

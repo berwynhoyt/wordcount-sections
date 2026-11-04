@@ -3,6 +3,8 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="wordcount_sections" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit  &apos; Require all variables to be dim'd: catches reads of non-existent variables / spelling mistakes
 
+Const DELETION_CONTEXT_CHARS = 30  &apos; Characters of surrounding text used to count a deletion in context
+
 &apos; Count words between bookmarked sections -- attached to hotkey Ctrl-Alt-W
 &apos; Create insertable wordcount fields for the wordcounts under Insert -&gt; Fields -&gt; More Fields... -&gt; Variables -&gt; User Field
 &apos; If there are bookmarks, update the field counts every time the document is saved
@@ -48,7 +50,7 @@ Function bookmark_wordcounter()
 		bookmark = gotoBookmark(cursor, last_valid_i, FALSE)
 		nextmark = gotoBookmark(cursor, i, TRUE)  &apos; select up to next bookmark
 		last_valid_i = i
-		count = wordcount_string(cursor.String) - deletedWordcount(cursor)
+		count = wordcount_string(cursor.String) - deletedWordcount(doc.Text, cursor.Start, cursor.End)
 		total = total + count
 		&apos; Also wordcount bookmarks from bookmark index fnote_i through bookmarkName
 		fnotecount = wordcountFootnotes(fnote_i, nextmark)
@@ -113,7 +115,8 @@ Function wordcountFootnotes(ByRef i, bookmark)
 				Exit do
 			endif
 		endif
-		wordcount = wordcount + wordcount_string(footnote.getString())
+		wordcount = wordcount + wordcount_string(footnote.getString()) _
+			- deletedWordcount(footnote, footnote.getStart(), footnote.getEnd())
 		i = i+1
 	loop
 	wordcountFootnotes = wordcount
@@ -174,25 +177,88 @@ Function wordcount_string(str)
 	wordcount_string=numwords
 End Function
 
-Function deletedWordcount(sectionCursor)
-	&apos; Sum wordcount of tracked-change deletions fully inside sectionCursor&apos;s range
-	dim doc, redlines, redline, i, wc, delcursor
-	doc = ThisComponent
-	redlines = doc.Redlines
+Function deletedWordcount(textObj, startRange, endRange)
+	&apos; Sum the words removed by tracked-change deletions that lie fully inside textObj between startRange and endRange.
+	&apos; textObj is the document body text or a footnote.
+	&apos; Adjacent deletions are counted as one group, since each one&apos;s context would otherwise contain the others.
+	dim redlines, redline, i, wc, inGroup, groupStart, groupEnd
+	redlines = ThisComponent.Redlines
 	wc = 0
+	inGroup = FALSE
 	for i = 0 to redlines.getCount() - 1
 		redline = redlines.getByIndex(i)
 		if redline.RedlineType = &quot;Delete&quot; then
-			&apos; compareRegionStarts returns &gt;0 if the first range is earlier, &lt;0 if later, 0 if equal
-			if doc.Text.compareRegionStarts(redline.RedlineStart, sectionCursor.Start) &lt;= 0 and _
-			   doc.Text.compareRegionStarts(redline.RedlineEnd, sectionCursor.End) &gt;= 0 then
-				delcursor = doc.Text.createTextCursorByRange(redline.RedlineStart)
-				delcursor.gotoRange(redline.RedlineEnd, TRUE)
-				wc = wc + wordcount_string(delcursor.getString())
+			if isRedlineInside(textObj, redline, startRange, endRange) then
+				&apos; Nested ifs because Basic&apos;s &quot;and&quot; does not short-circuit: groupEnd is unset when not inGroup
+				if inGroup then
+					&apos; If this deletion starts exactly where the group ends, extend the group to include it.
+					&apos; Otherwise count the finished group and start a new one with this deletion.
+					&apos; This is necessary because deletionWordcount() measures a deletion against its surrounding text.
+					&apos; If a neighbouring deletion were counted separately, its deleted text would wrongly be in that context.
+					&apos; E.g. in &quot;28).[ Likewise ][is ]about&quot;, counting the first deletion alone compares against &quot;28).is about&quot;.
+					&apos; There, &quot;28).is&quot; glues into one word, so the deletion seems to remove one word too many.
+					if textObj.compareRegionStarts(groupEnd, redline.RedlineStart) = 0 then
+						groupEnd = redline.RedlineEnd
+					else
+						wc = wc + deletionWordcount(groupStart, groupEnd)
+						inGroup = FALSE
+					endif
+				endif
+				if not inGroup then
+					groupStart = redline.RedlineStart
+					groupEnd = redline.RedlineEnd
+					inGroup = TRUE
+				endif
 			endif
 		endif
 	next i
+	if inGroup then wc = wc + deletionWordcount(groupStart, groupEnd)
 	deletedWordcount = wc
+End Function
+
+Function isRedlineInside(textObj, redline, startRange, endRange)
+	&apos; Return TRUE if redline lies fully inside textObj between startRange and endRange.
+	&apos; compareRegionStarts returns &gt;0 if the first range is earlier, &lt;0 if later, 0 if equal.
+	&apos; It raises an error for a range in a different text (e.g. a footnote vs the body), which means not inside.
+	isRedlineInside = FALSE
+	on Local Error goto notInside
+	if textObj.compareRegionStarts(redline.RedlineStart, startRange) &lt;= 0 and _
+	   textObj.compareRegionStarts(redline.RedlineEnd, endRange) &gt;= 0 then isRedlineInside = TRUE
+  notInside:
+End Function
+
+Function deletionWordcount(startPos, endPos)
+	&apos; Return the number of words removed by tracked-change deleted text from startPos to endPos.
+	&apos; Counting the deleted string on its own is wrong when it is joined to a kept word.
+	&apos; For example, deleting &quot;s&quot; from &quot;sees&quot; removes no words, but the string &quot;s&quot; counts as one word.
+	&apos; So count the deletion together with its surrounding text, then subtract the count without it.
+	dim cursor, deleted, before, after
+	cursor = startPos.Text.createTextCursorByRange(startPos)
+	cursor.gotoRange(endPos, TRUE)
+	deleted = cursor.getString()
+	before = contextString(startPos, TRUE)
+	after = contextString(endPos, FALSE)
+	deletionWordcount = wordcount_string(before &amp; deleted &amp; after) - wordcount_string(before &amp; after)
+End Function
+
+Function contextString(position, leftwards)
+	&apos; Return up to DELETION_CONTEXT_CHARS characters of text to the left or right of position.
+	&apos; Partial words at the far edges do not matter, since they appear in both counts of deletionWordcount.
+	dim cursor, i
+	cursor = position.Text.createTextCursorByRange(position)
+	if leftwards then
+		cursor.collapseToStart()
+	else
+		cursor.collapseToEnd()
+	endif
+	for i = 1 to DELETION_CONTEXT_CHARS
+		if leftwards then
+			if not cursor.goLeft(1, TRUE) then exit for
+		else
+			if not cursor.goRight(1, TRUE) then exit for
+		endif
+	next i
+	contextString = cursor.getString()
 End Function
 
 Function update_field(varname, value)
